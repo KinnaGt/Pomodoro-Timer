@@ -1,10 +1,17 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:pomodoro/responsive/responsive_app.dart';
+import 'package:pomodoro/responsive/sizing_info.dart';
 
-void main() {
+
+
+
+void main() async{
   runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
     home: Pomodoro()
@@ -20,24 +27,30 @@ class Pomodoro extends StatefulWidget {
 }
 
 class _PomodoroState extends State<Pomodoro> {
+  
+  static AudioCache player = AudioCache();
+  
   static const maxSeconds = 60;
   int seconds = 0;
   bool isBreakTime = false;
   int minutes = 25;
   int breakTime = 5;
+  int shortBreakTime = 5;
+  int largeBreakTime = 15;
+  int pomodoroTime = 25;
+  int breakInterval = 4;
   int breaksCounter = 0;
+  
   List<Color> gradientStudiying = [const Color(0xff7659FF),const Color(0xff7298D9)];
   List<Color> gradientBreak = [const Color(0xff171717),const Color(0xff252525)];
   Timer? timer;
 
- bool isInstructionView = true;
-  @override
-  void initState() {
-    isInstructionView = isInstructionView;
-    super.initState();
-  }
+ bool _notifications = true;
+ bool _alarm = true;
+ double _volumeAlarm = 60;
   startTimer(){
-    timer = Timer.periodic(Duration(milliseconds: 1), (timer) { 
+    timer?.cancel();
+    timer = Timer.periodic(Duration(seconds: 1), (timer) { 
       if(minutes >= 0 ){
         setState(() {
           seconds--;
@@ -47,7 +60,6 @@ class _PomodoroState extends State<Pomodoro> {
               if(minutes <0 ){
                 resetTimer();
               }
-            
           }
         } );
       }else{
@@ -61,32 +73,75 @@ class _PomodoroState extends State<Pomodoro> {
       timer?.cancel();
     });
   }
-
+  play() async{
+      player.clearAll();
+      player.play('audio/alarm.mp3',volume: _volumeAlarm/100);
+  }
   resetTimer(){
+    if(_alarm)
+    {
+      play();
+    }
+    // NotificationService().showNotification(1,isBreakTime ? "Break Time " : "Focus Time",isBreakTime ? "You need a break for 5 minutes" : "You have 25 minutes to focus on it",5);
+    
     setState(() {
       isBreakTime = !isBreakTime;
       seconds = 0;
       if (isBreakTime)
       {
-        if(breaksCounter == 3){
-        breakTime = 15;
+        if(breaksCounter ==  breakInterval- 1){
+        breakTime = largeBreakTime;
         breaksCounter = 0;
         }
         else {
-          breakTime = 5;
+          breakTime = shortBreakTime;
           breaksCounter++;
         }
       }
-      minutes = isBreakTime ? breakTime : 25;
+      minutes = isBreakTime ? breakTime : pomodoroTime;
       
       timer?.cancel();
     });
+    
+    if(_notifications){
+      _showNotification();
+    }
+   
   }
-  
+
+
+  late FlutterLocalNotificationsPlugin localNotifications;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    var androidInitialize = AndroidInitializationSettings('@drawable/ic_stat_alarm_on');
+    var iOSInitialize = IOSInitializationSettings();
+    var initializationSettings = InitializationSettings(
+      android: androidInitialize,
+      iOS: iOSInitialize);
+    localNotifications  = FlutterLocalNotificationsPlugin();
+    localNotifications.initialize(initializationSettings);
+  }
+
+Future _showNotification() async {
+  var androidDetails =  AndroidNotificationDetails('channel id', 'local notifications',channelDescription: 'This is the description',importance: Importance.high);
+  var iOSDetails = IOSNotificationDetails();
+  var generalNotificationDetails = NotificationDetails(android: androidDetails,iOS: iOSDetails);
+  await localNotifications.show(0,isBreakTime ? "Break Time " : "Focus Time",isBreakTime ? "You need a break for 5 minutes" : "You have 25 minutes to focus on it",generalNotificationDetails);
+}
+
   @override
   Widget build(BuildContext context) {
+    Size size  = MediaQuery.of(context).size;
+    late ResponsiveApp responsiveApp;
+    responsiveApp= ResponsiveApp(context);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    return SafeArea(
+    return WillPopScope(
+      onWillPop: () async => false,
+      child:  SafeArea(
+      
       child: Scaffold(
         body: Container(
           decoration: BoxDecoration(
@@ -105,12 +160,11 @@ class _PomodoroState extends State<Pomodoro> {
                   mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(child: Container()),
-                  SizedBox(width: 70,),
                   Center(child: Text(
                   "Pomodoro",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 40,
+                    fontSize: responsiveApp.headline3,
                     fontFamily: 'Montserrat',
                     fontWeight: FontWeight.w400,
                   ),
@@ -134,13 +188,13 @@ class _PomodoroState extends State<Pomodoro> {
               Expanded(
                 child: CircularPercentIndicator(
                   circularStrokeCap:CircularStrokeCap.round,
-                  percent: isBreakTime ? minutes/breakTime : minutes/25,
+                  percent: isBreakTime ? minutes/breakTime : minutes/pomodoroTime,
                   backgroundColor: Colors.white,
                   animateFromLastPercent: true,
                   animation: true ,
                   radius:250,
-                  lineWidth: 20.0,
-                  progressColor: isBreakTime ? Colors.indigo : Color(0xFFF9B384),
+                  lineWidth: 15.0,
+                  progressColor: isBreakTime ? Colors.indigo.shade300 : Colors.teal.shade200,
                   center: Text(
                     "$minutes : " + (seconds).toString().padLeft(2, '0'),
                     style: TextStyle(
@@ -154,7 +208,7 @@ class _PomodoroState extends State<Pomodoro> {
                 child: Text(isBreakTime ? "Time to Break" : "Lets do it!",
                   style: TextStyle(
                     color:Colors.white,
-                    fontSize: 26 ),
+                    fontSize: responsiveApp.bodyText1 ),
                 ),
               ),
               buildButton(),
@@ -162,7 +216,7 @@ class _PomodoroState extends State<Pomodoro> {
           )
         )
       ),
-    );
+    ));
   }
   
   Future aboutPopUp(BuildContext context){
@@ -171,7 +225,8 @@ class _PomodoroState extends State<Pomodoro> {
       builder: (context){
         return AlertDialog(
           title: Text("About Pomodoro",style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Column(
+          content: SingleChildScrollView(
+            child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -184,7 +239,7 @@ class _PomodoroState extends State<Pomodoro> {
               Text("4 - Take a 5-minute break for energy renewal, start another Pomodoro.\n"),
               Text("5 - Take a 20-30 minute break after completing four Pomodoros.")
             ]
-          ),
+          )),
           actions: [
             MaterialButton(
                 child: Container(
@@ -208,88 +263,168 @@ class _PomodoroState extends State<Pomodoro> {
     );
   }
 
+  
   Future settingsPopUp(BuildContext context){
-    TextEditingController minutes = TextEditingController();
-    TextEditingController short = TextEditingController();
-    TextEditingController large = TextEditingController();
-
+    TextEditingController minutesCon = TextEditingController(text: pomodoroTime.toString());
+    TextEditingController shortCon = TextEditingController(text: shortBreakTime.toString());
+    TextEditingController largeCon = TextEditingController(text: largeBreakTime.toString());
+    TextEditingController intervalCon = TextEditingController(text: breakInterval.toString());
     int minutesStudiying,shortBreak,largeBreak;
     return showDialog(
       context: context,
       builder: (context){
+        
+      return StatefulBuilder(
+      builder: (context, setState) {
+        final _formKey = GlobalKey<FormState>();
         return AlertDialog(
           title: Text("Timer Settings",style: TextStyle(fontWeight: FontWeight.bold,color: Color(0xFF171717)),),
-          content: Column(
+          content: SingleChildScrollView(  
+            child: Column(
             children: [
               Row(
                 children: [
-                  SizedBox(width: 25,),
                   Column(
                     children: [
-                      Text("Pomodoro",style: TextStyle(fontSize: 16),),
+                      Text("Pomodoro",style: TextStyle(fontSize: isMobileSmall(context)? 10 : 14),),
                       SizedBox(height: 10,),
-                      Container(
+                      SizedBox(
                         height: 30,
-                        width: 75,
-                        child: Center(child: Text("25")),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.lime),
-                          borderRadius: BorderRadius.all(Radius.circular(20)) 
+                        width:  isMobileSmall(context) ? 50 : 75,
+                        child:  Center(
+                          child: TextFormField(
+                            key: _formKey,
+                            validator: (value) {
+                              if (value == null || value.isEmpty || int.parse(value.toString()) <= 0) {
+                                return 'Put a natural number';
+                              }
+                              return null;
+                            },
+                            controller: minutesCon,
+                            maxLength: 2,
+                            cursorColor: Colors.lime,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              errorStyle: TextStyle(fontSize: 20.0,color: Colors.orange),
+                              focusedErrorBorder: OutlineInputBorder(borderSide: BorderSide(color: 
+                              Colors.orange)),
+                              enabledBorder: const OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.lime, width: 0.0),
+                              ),
+                              contentPadding: EdgeInsets.all(0),
+                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.lime),borderRadius: BorderRadius.circular(20)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                              counterText: "",
+                            ),
+                          ) 
                         ),
-                      )
+                      ),
                     ]
                   ),
-                  SizedBox(width: 25,),
+                  SizedBox(width:  isMobileSmall(context) ? 35 : 25,),
                   Column(
                     children: [
-                      Text("Short Break",style: TextStyle(fontSize: 16)),
+                      Text("Short Break",style: TextStyle(fontSize: isMobileSmall(context)? 10 : 14)),
                       SizedBox(height: 10,),
-                      Container(
+                      SizedBox(
                         height: 30,
-                        width: 75,
-                        
-                        child: Center(child: Text("5")),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.lime),
-                          borderRadius: BorderRadius.all(Radius.circular(20)) 
+                        width:  isMobileSmall(context) ? 50 : 75,
+                        child:  Center(
+                          child: TextFormField(
+                            maxLength: 2,
+                            controller: shortCon,
+                            // initialValue: shortBreakTime.toString() ,
+                            cursorColor: Colors.lime,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              errorStyle: TextStyle(fontSize: 20.0,color: Colors.orange),
+                              focusedErrorBorder: OutlineInputBorder(borderSide: BorderSide(color: 
+                              Colors.orange)),
+                              enabledBorder: const OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.lime, width: 0.0),
+                              ),
+                              contentPadding: EdgeInsets.all(0),
+                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.limeAccent),borderRadius: BorderRadius.circular(20)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                              counterText: "",
+                            ),
+                          ) 
                         ),
-                      )
+                      ),
                     ]
                   ),
-                  SizedBox(width: 25,),
+                  
+                  SizedBox(width:  isMobileSmall(context) ? 35 : 25,),
                   Column(
                     children: [
-                      Text("Large Break",style: TextStyle(fontSize: 16)),
+                      Text("Large Break",style: TextStyle(fontSize: isMobileSmall(context)? 10 : 14)),
                       SizedBox(height: 10,),
-                      Container(
+                      SizedBox(
                         height: 30,
-                        width: 75,
-                        child: Center(child: Text("15")),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.lime),
-                          borderRadius: BorderRadius.all(Radius.circular(20)) 
+                        width:  isMobileSmall(context) ? 50 : 75,
+                        child:  Center(
+                          child: TextFormField(
+                            //initialValue:  largeBreakTime.toString(),
+                            controller: largeCon,
+                            maxLength: 2,
+                            cursorColor: Colors.lime,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              errorStyle: TextStyle(fontSize: 20.0,color: Colors.orange),
+                              focusedErrorBorder: OutlineInputBorder(borderSide: BorderSide(color: 
+                              Colors.orange)),
+                              enabledBorder: const OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.lime, width: 0.0),
+                              ),
+                              contentPadding: EdgeInsets.all(0),
+                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.lime),borderRadius: BorderRadius.circular(20)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                              counterText: "",
+                            ),
+                          ) 
                         ),
-                      )
+                      ),
                     ]
                   ),
-                  SizedBox(width: 25,)
+
+
                 ],
               ),
               
               dividerSections(),
               Row(
                 children: [
-                  
-                  SizedBox(width: 25,),
+                  SizedBox(width: 5,),
                   Text("Long Break interval"),
                   Expanded(child: Container(),),
-                  Container(
+                  SizedBox(
                         height: 30,
-                        width: 75,
-                        child: Center(child: Text("4")),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.lime),
-                          borderRadius: BorderRadius.all(Radius.circular(20)) 
+                        width: isMobileSmall(context) ? 50 : 75,
+                        child:  Center(
+                          child: TextFormField(
+                            //initialValue:breakInterval.toString(),
+                            controller: intervalCon,
+                            maxLength: 2,
+                            cursorColor: Colors.lime,
+                            textAlign: TextAlign.center,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              errorStyle: TextStyle(fontSize: 20.0,color: Colors.orange),
+                              focusedErrorBorder: OutlineInputBorder(borderSide: BorderSide(color: 
+                              Colors.orange)),
+                              enabledBorder: const OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.lime, width: 0.0),
+                              ),
+                              contentPadding: EdgeInsets.all(0),
+                             
+                              focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.lime),borderRadius: BorderRadius.circular(20)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                              counterText: "",
+                            ),
+                          ) 
                         ),
                       ),
                   SizedBox(width: 30,)
@@ -298,16 +433,16 @@ class _PomodoroState extends State<Pomodoro> {
               dividerSections(),
               Row(
                 children: [
-                  SizedBox(width: 25,),
+                  SizedBox(width: 5,),
                   Text("Notifications"),
                   Expanded(child: Container()),
                   Switch(
-                    value: isInstructionView,
+                    value: _notifications,
                     onChanged: (bool isOn) {
                       print(isOn);
                       setState(() {
-                      isInstructionView = !isInstructionView;
-                      print(isInstructionView);
+                        _notifications = !_notifications;
+                        
                       });
                     },
                     activeColor: Colors.lime,
@@ -315,28 +450,68 @@ class _PomodoroState extends State<Pomodoro> {
                   SizedBox(width: 30,),
                 ],),
               dividerSections(),
-              // Row(
-              //   children: [
-              //     SizedBox(width: 25,),
-              //     Text("Alarm Sound"),
-              //     Expanded(child: Container()),
-              //     Switch(
-              //       value: notifications,
-              //       onChanged: (bool val) { 
-                        // setState(() {
-                        //   notifications = val;
-                        // });
-              //        }, 
-              //       activeColor: Colors.lime,
-              //     ),
+              Row(
+                children: [
+                  SizedBox(width: 5,),
+                  Text("Alarm Sound"),
+                  Expanded(child: Container()),
+                  Switch(
+                    value: _alarm,
+                    onChanged: (bool val) { 
+                        setState(() {
+                          _alarm = val;
+                        });
+                     }, 
+                    activeColor: Colors.lime,
+                  ),
                   
-              //     SizedBox(width: 30,),
-              //   ],
-              // ),
+                  SizedBox(width: 30,),
+                ],
+              ),
+              Slider(
+                activeColor: Colors.lime,
+                label: _volumeAlarm.round().toString(),
+                divisions: 20,
+                onChanged: (double value) {
+                  setState(() {
+                    _volumeAlarm = value;
+                  });
+                },
+                 max: 100,
+                value: _volumeAlarm,
+              ),
+              dividerSections()
             ],
-          ),
-
+          )),
+          actions: [
+            MaterialButton(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 20),
+                  child: Container(
+                  width: 100,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.lime,
+                    borderRadius: BorderRadius.all(Radius.circular(20))
+                  ),
+                    child : Center(child: Text("Ok",style: TextStyle(color: Colors.white,fontSize: 20),))
+                  ),),
+                onPressed: (){
+                  if (_formKey.currentState!.validate()) {
+                  pomodoroTime = int.parse(minutesCon.text.toString());
+                  shortBreakTime = int.parse(shortCon.text.toString());
+                  largeBreakTime = int.parse(largeCon.text.toString());
+                  breakInterval = int.parse(intervalCon.text.toString());
+                  Navigator.of(context).pop();
+                }
+                  
+                //For Pass The String to another context
+                // Navigator.of(context).pop(customController.text.toString());
+              },
+            ),
+          ],
         );
+      });
       }
     );
   }
@@ -365,14 +540,11 @@ class _PomodoroState extends State<Pomodoro> {
         child: Stack(
         children: [
         Center(
-          child: Container(
-            child: IconButton(
-            color:Color(0xFF171717),
-              icon:  isRunning ? Icon(Icons.pause_outlined) : Icon(Icons.play_arrow_outlined),
-              onPressed: isRunning ? stopTimer : startTimer ,
-              iconSize: 120,
-            ),
-
+          child: IconButton(
+          color:Color(0xFF171717),
+            icon:  isRunning ? Icon(Icons.pause_outlined) : Icon(Icons.play_arrow_outlined),
+            onPressed: isRunning ? stopTimer : startTimer ,
+            iconSize: 120,
           ),
         ),
         Positioned(
@@ -381,15 +553,60 @@ class _PomodoroState extends State<Pomodoro> {
           child: Container(
               child: IconButton(
             icon : Icon(Icons.skip_next_outlined),
-            onPressed: resetTimer,
+            onPressed:  () => confirmationDialog(context),
             iconSize: 60,
         ),
-          ),)
+          ),),
+        // Positioned(
+        //   bottom: 0,
+        //   left: 0,
+        //   child: IconButton(
+        //   icon: Icon(Icons.notifications),
+        //   onPressed: () => {
+        //     _showNotification()
+        //   } 
+        //   ))
         ],
       )
     );
       
   }
+
+
+  Future confirmationDialog(BuildContext context){
+    return showDialog(
+      barrierDismissible: false, // user must tap button!
+      context: context,
+      builder: (context){
+        return AlertDialog(
+          title: Text('Confirm'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: <Widget>[
+                Text('Are you sure you want to finish the round early? '),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Confirm'),
+              onPressed: () {
+                resetTimer();
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      }
+    );
+  }
 }
+
 
 
