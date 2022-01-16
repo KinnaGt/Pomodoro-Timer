@@ -230,7 +230,7 @@ Future _showNotification() async {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("The Pomodoro Technique is a time management method developed by Francesco Cirillo in the late 1980s. It uses a timer to break work into intervals, traditionally 25 minutes in length, separated by short breaks.​\n"),
+              Text(" The Pomodoro Technique is a time management method developed by Francesco Cirillo in the late 1980s.\n It uses a timer to break work into intervals, traditionally 25 minutes in length, separated by short breaks.​\n"),
               SizedBox(height: 15,),
               Center(child: Text("5 Steps for Using the Pomodoro Technique\n",style: TextStyle(fontWeight: FontWeight.bold),)),
               Text("1 - Choose your task and total time to work on it.\n"),
