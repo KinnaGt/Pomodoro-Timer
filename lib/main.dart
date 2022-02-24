@@ -12,7 +12,7 @@ import 'package:pomodoro/responsive/sizing_info.dart';
 
 
 void main() async{
-  runApp(MaterialApp(
+  runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
     home: Pomodoro()
   ));
@@ -134,7 +134,6 @@ Future _showNotification() async {
 
   @override
   Widget build(BuildContext context) {
-    Size size  = MediaQuery.of(context).size;
     late ResponsiveApp responsiveApp;
     responsiveApp= ResponsiveApp(context);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -194,7 +193,7 @@ Future _showNotification() async {
                   animation: true ,
                   radius:250,
                   lineWidth: 15.0,
-                  progressColor: isBreakTime ? Colors.indigo.shade300 : Colors.teal.shade200,
+                  progressColor: isBreakTime ? Colors.indigo.shade300 : Color(0xFFf2be00),
                   center: Text(
                     "$minutes : " + (seconds).toString().padLeft(2, '0'),
                     style: TextStyle(
